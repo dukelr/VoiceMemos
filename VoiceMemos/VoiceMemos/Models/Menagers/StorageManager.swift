@@ -5,7 +5,7 @@ private extension String {
     static let countKey = "count"
 }
 
-class StorageManager {
+final class StorageManager {
     
     static let shared = StorageManager()
     

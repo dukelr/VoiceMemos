@@ -5,7 +5,7 @@ import AVFoundation
 //MARK: - Protocols
 
 protocol AudioPlayerViewControllerDelegate: AnyObject {
-    func recordingRemoved(_ recording: Recording)
+    func audioPlayerViewControllerClosed(withRemoved recording: Recording)
 }
 
 //MARK: - private extensions
@@ -29,52 +29,45 @@ private extension UIImage {
     static let backImage = UIImage(systemName: "chevron.backward")
 }
 
-class AudioPlayerViewController: UIViewController {
-    
-    //MARK: - Enums
-    
-    private enum Rewinding {
-        case backward
-        case forward
-        case slider
-    }
+final class AudioPlayerViewController: UIViewController {
     
     //MARK: - var/let
     
     static let identifier = "AudioPlayerViewController"
-    private var audioPlayer: AVAudioPlayer?
     weak var delegate: AudioPlayerViewControllerDelegate?
     private let slider = UISlider()
     private let playButton = UIButton()
     private let nameRecordingLabel = UILabel()
     private let elapsedDurationRecordingLabel = UILabel()
     private let remainingDurationRecordingLabel = UILabel()
-    private var recordingDurationTimer = Timer()
-    var recording: Recording?
+    var presenter: AudioPlayerPresenter?
     
     //MARK: - lifecycle funcs
     
     override func viewDidLoad() {
         super.viewDidLoad()
+        setupPresenter()
         setupSubviews()
     }
     
     //MARK: - IBActions
     
     @IBAction func playButtonPressed(_ sender: UIButton) {
-        playRecording()
+        presenter?.playRecording(!sender.isSelected)
+        sender.isSelected.toggle()
     }
     
     @IBAction func sliderValuerChanged(_ sender: UISlider) {
-        rewindRecording(.slider)
+        playButton.isSelected = true
+        presenter?.rewindRecording(.slider, sliderValue: slider.value)
     }
     
     @IBAction func flashForwardButtonPressed(_ sender: UIButton) {
-        rewindRecording(.forward)
+        presenter?.rewindRecording(.forward)
     }
     
     @IBAction func flashBackwardButtonPressed(_ sender: UIButton) {
-        rewindRecording(.backward)
+        presenter?.rewindRecording(.backward)
     }
     
     @IBAction func trashButtonPressed(_ sender: UIButton) {
@@ -85,20 +78,21 @@ class AudioPlayerViewController: UIViewController {
         popToVoiceMemosViewController()
     }
     
-    //MARK: - setup UI funcs
+    //MARK: - flow funcs
+
+    private func setupPresenter() {
+        presenter?.delegate = self
+    }
     
     private func setupSubviews() {
-        view.backgroundColor = .black
         addSubviews()
-        if let recording = recording {
-            nameRecordingLabel.text = recording.name
-            elapsedDurationRecordingLabel.text = .zeroTime
-            remainingDurationRecordingLabel.text = recording.duration
-            audioPlayer = try? AVAudioPlayer(contentsOf: recording.url)
-            
-            if let audioPlayer = audioPlayer {
-                slider.maximumValue = Float(audioPlayer.duration)
-            }
+        view.backgroundColor = .black
+        nameRecordingLabel.text = presenter?.recording.name
+        elapsedDurationRecordingLabel.text = .zeroTime
+        remainingDurationRecordingLabel.text = presenter?.recording.duration
+
+        if let maximumValue = presenter?.getFullDurationRecording() {
+            slider.maximumValue = maximumValue
         }
     }
     
@@ -234,63 +228,15 @@ class AudioPlayerViewController: UIViewController {
         view.addSubview(backButton)
     }
     
-    //MARK: - flow funcs
-    
-    private func playRecording() {
-        if !playButton.isSelected {
-            audioPlayer?.prepareToPlay()
-            audioPlayer?.play()
-            startTimer()
-        } else {
-            audioPlayer?.pause()
-            recordingDurationTimer.invalidate()
-        }
-        playButton.isSelected.toggle()
-    }
-    
-    private func startTimer() {
-        guard let audioPlayer = audioPlayer else { return }
-        let timeInterval = 0.1
-        let secondsInMinute = Double(60)
-        recordingDurationTimer.invalidate()
-        recordingDurationTimer = .scheduledTimer(
-            withTimeInterval: timeInterval,
-            repeats: true
-        ) { [weak self] _ in
-            if !audioPlayer.isPlaying {
-                self?.playButton.isSelected = false
-            }
-            self?.slider.value = Float(audioPlayer.currentTime)
-            self?.elapsedDurationRecordingLabel.text = String(
-                format: .recordingDurationFormat,
-                Int(audioPlayer.currentTime / secondsInMinute),
-                Int(audioPlayer.currentTime.truncatingRemainder(dividingBy: secondsInMinute))
-            )
-            self?.remainingDurationRecordingLabel.text = String(
-                format: .recordingDurationFormat,
-                Int((audioPlayer.duration / secondsInMinute) - (audioPlayer.currentTime / secondsInMinute)),
-                Int((audioPlayer.duration.truncatingRemainder(dividingBy: secondsInMinute)) - (audioPlayer.currentTime.truncatingRemainder(dividingBy: secondsInMinute)))
-            )
-        }
-    }
-    
-    private func rewindRecording(_ rewinding: Rewinding) {
-        let seconds = Double(15)
-        switch rewinding {
-        case .backward:
-            audioPlayer?.currentTime -= seconds
-        case .forward:
-            audioPlayer?.currentTime += seconds
-        case .slider:
-            playButton.isSelected = false
-            playRecording()
-            audioPlayer?.currentTime = Double(slider.value)
-        }
+    private func setupDurationLabelsAndSlider() {
+        slider.value = presenter?.getCurrentTimeRecording() ?? .zero
+        elapsedDurationRecordingLabel.text = presenter?.getElapsedDurationRecording()
+        remainingDurationRecordingLabel.text = presenter?.getRemainingDurationRecording()
     }
     
     private func showAlert() {
         let alert = UIAlertController(
-            title: recording?.name,
+            title: presenter?.recording.name,
             message: .alertMessage,
             preferredStyle: .alert
         )
@@ -299,7 +245,9 @@ class AudioPlayerViewController: UIViewController {
                 title: .remove,
                 style: .destructive)
             { [weak self] _ in
-                self?.removeRecording()
+                guard let self = self else { return }
+                
+                self.presenter?.removeRecording()
             }
         )
         alert.addAction(
@@ -309,18 +257,30 @@ class AudioPlayerViewController: UIViewController {
             )
         )
         present(alert, animated: true)
-        audioPlayer?.stop()
-    }
-    
-    private func removeRecording() {
-        if let recording = recording {
-            delegate?.recordingRemoved(recording)
-            popToVoiceMemosViewController()
-        }
+        presenter?.stopAudioPlayer()
     }
     
     private func popToVoiceMemosViewController() {
-        audioPlayer?.stop()
+        presenter?.stopAudioPlayer()
         navigationController?.popToRootViewController(animated: true)
+    }
+}
+
+extension AudioPlayerViewController: AudioPlayerPresenterDelegate {
+    func valuesDurationUpdated() {
+        setupDurationLabelsAndSlider()
+    }
+    
+    func recordingStartedPlaying(_ playing: Bool) {
+        if playing {
+            setupDurationLabelsAndSlider()
+        } else {
+            playButton.isSelected = false
+        }
+    }
+    
+    func recordingRemoved(_ recording: Recording) {
+        delegate?.audioPlayerViewControllerClosed(withRemoved: recording)
+        popToVoiceMemosViewController()
     }
 }

@@ -1,6 +1,5 @@
 
 import UIKit
-import AVFoundation
 
 //MARK: - private extensions
 
@@ -10,34 +9,16 @@ private extension String {
     static let messageForAlert = "The app needs access to the microphone"
     static let ok = "OK"
     static let cancel = "Cancel"
-    static let dateFormat = "dd.MM.yyyy_HH:mm"
-    static let pathExtension = "m4a"
-    static let dot = "."
-    static let underscore = "_"
-    static let space = " "
-    static let empty = ""
-    
-    static func getNewNameRecording(_ number: Int) -> String {
-        "New_Recording_\(number)_"
-    }
-}
-
-private extension Double {
-    static let durationForAnimate = 0.3
-    static let secondsInMinute = 60.0
 }
 
 private extension CGFloat {
     static let heightForRow = 70.0
 }
 
-class VoiceMemosViewController: UIViewController {
+final class VoiceMemosViewController: UIViewController {
     
     //MARK: var/let
-    
-    private var audioRecorder: AVAudioRecorder?
-    private var audioPlayer: AVAudioPlayer?
-    private var recordSession: AVAudioSession?
+
     private let hintLabel = UILabel()
     private let topContainerView = UIView()
     private let bottomContainerView = UIView()
@@ -45,63 +26,52 @@ class VoiceMemosViewController: UIViewController {
     private let recordingDurationLabel = UILabel()
     private let recordButton = UIButton()
     private let listRecordingsTableView = UITableView()
-    private var recordingsArray = [Recording]()
-    private var timer = Timer()
-    private var countRecordings = 0
+    private let presenter = VoiceMemosPresenter()
     
     //MARK: - lifecycle funcs
     
     override func viewDidLoad() {
         super.viewDidLoad()
+        setupPresenter()
         setupSubviews()
     }
     
     //MARK: - IBActions
     
     @IBAction func recordButtonPressed(_ sender: UIButton) {
-        startRecording(!sender.isSelected)
+        presenter.startRecording(!sender.isSelected)
     }
     
-    //MARK: - setup UI funcs
+    //MARK: - flow funcs
+    
+    private func setupPresenter() {
+        presenter.delegate = self
+        presenter.checkPermission { [weak self] granted in
+            guard let self = self else { return }
+            
+            if !granted {
+                self.showAlert()
+            }
+        }
+    }
     
     private func setupSubviews() {
-        if let count = StorageManager.shared.loadCountRecordings() {
-            countRecordings = count
-        }
-        if listRecordingsTableView.numberOfRows(inSection: .zero) == .zero {
-            hintLabel.isHidden = true
-        } else {
+        if presenter.countRecordings == .zero {
             hintLabel.isHidden = false
+        } else {
+            hintLabel.isHidden = true
         }
         view.backgroundColor = .black
         addSubviews()
-        checkPermission()
-        updateListRecordings()
     }
     
     private func addSubviews() {
-        addTitleLabel()
         addContainerViews()
+        addTitleLabel()
         addRecordingLabels()
         addRecordButton()
         addTableView()
         addHintLabel()
-    }
-    
-    private func addTitleLabel() {
-        let offset = CGFloat(20)
-        let titleLabel = UILabel(
-            frame: CGRect(
-                x: offset,
-                y: offset * 4,
-                width: view.frame.width,
-                height: offset
-            )
-        )
-        titleLabel.text = .titleText
-        titleLabel.font = .helveticaBolt
-        titleLabel.textColor = .white
-        view.addSubview(titleLabel)
     }
     
     private func addHintLabel() {
@@ -121,20 +91,16 @@ class VoiceMemosViewController: UIViewController {
     }
     
     private func addContainerViews() {
-        let size = view.frame.height / 8
         let alpha = 0.2
-        topContainerView.frame.origin = view.frame.origin
-        topContainerView.frame.size = CGSize(
-            width: view.frame.width,
-            height: size
-        )
+        topContainerView.frame = view.frame
+        topContainerView.frame.size.height /= 8
         view.addSubview(topContainerView)
         
         let height = 0.7
         let separatorView = UIView(
             frame: CGRect(
                 x: .zero,
-                y: size - height,
+                y: topContainerView.frame.height - height,
                 width: view.frame.width,
                 height: height
             )
@@ -144,27 +110,43 @@ class VoiceMemosViewController: UIViewController {
         
         bottomContainerView.frame = CGRect(
             x: .zero,
-            y: view.frame.height - size,
+            y: view.frame.height - topContainerView.frame.height,
             width: view.frame.width,
-            height: size)
+            height: topContainerView.frame.height)
         bottomContainerView.backgroundColor = .lightGray.withAlphaComponent(alpha)
         view.addSubview(bottomContainerView)
     }
     
+    private func addTitleLabel() {
+        let offset = CGFloat(20)
+        let titleLabel = UILabel(
+            frame: CGRect(
+                x: offset,
+                y: topContainerView.frame.height - offset * 2,
+                width: view.frame.width,
+                height: offset
+            )
+        )
+        titleLabel.text = .titleText
+        titleLabel.font = .helveticaBolt
+        titleLabel.textColor = .white
+        view.addSubview(titleLabel)
+    }
+    
     private func addRecordingLabels() {
-        let size = CGFloat(25)
+        let height = CGFloat(25)
         recordingDurationLabel.frame = CGRect(
             x: .zero,
-            y: bottomContainerView.frame.origin.y - size,
+            y: bottomContainerView.frame.origin.y - height,
             width: view.frame.width,
-            height: size)
+            height: height)
         recordingDurationLabel.textColor = .white
         recordingDurationLabel.textAlignment = .center
         recordingDurationLabel.isHidden = true
         view.addSubview(recordingDurationLabel)
         
         recordingNameLabel.frame = recordingDurationLabel.frame
-        recordingNameLabel.frame.origin.y -= size
+        recordingNameLabel.frame.origin.y -= height
         recordingNameLabel.textColor = .white
         recordingNameLabel.textAlignment = .center
         recordingNameLabel.isHidden = true
@@ -173,13 +155,13 @@ class VoiceMemosViewController: UIViewController {
     
     private func addRecordButton() {
         let offset = CGFloat(2.5)
-        let size = CGFloat(50)
+        let height = CGFloat(50)
         let borderView = UIView()
         borderView.frame = CGRect(
-            x: bottomContainerView.frame.width / 2 - size / 2,
-            y: bottomContainerView.frame.origin.y + size / 2.5,
-            width: size,
-            height: size
+            x: bottomContainerView.frame.width / 2 - height / 2,
+            y: bottomContainerView.frame.origin.y + height / 2.5,
+            width: height,
+            height: height
         )
         borderView.backgroundColor = .white
         borderView.layer.cornerRadius = borderView.frame.width / 2
@@ -221,78 +203,15 @@ class VoiceMemosViewController: UIViewController {
         listRecordingsTableView.separatorStyle = .singleLine
         listRecordingsTableView.separatorColor = .lightGray.withAlphaComponent(alpha)
         listRecordingsTableView.backgroundColor = view.backgroundColor
-        view.addSubview(listRecordingsTableView)
         listRecordingsTableView.register(
             RecordingTableViewCell.self,
             forCellReuseIdentifier: RecordingTableViewCell.identifier
         )
         listRecordingsTableView.delegate = self
         listRecordingsTableView.dataSource = self
+        view.addSubview(listRecordingsTableView)
     }
-    
-    //MARK: - flow funcs
-    
-    func updateListRecordings() {
-        do {
-            guard let path = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask).first else { return }
-            
-            let urls = try FileManager.default.contentsOfDirectory(
-                at: path,
-                includingPropertiesForKeys: [.creationDateKey],
-                options: .skipsHiddenFiles
-            )
-            urls.filter { $0.pathExtension == .pathExtension }
-                .sorted(by: { $0.lastPathComponent < $1.lastPathComponent })
-                .forEach { url in
-                    audioPlayer = try? AVAudioPlayer(contentsOf: url)
-                    guard let audioPlayer = audioPlayer else { return }
-                    
-                    var urlName = url.lastPathComponent
-                        .replacingOccurrences(of: String.underscore, with: String.space)
-                        .replacingOccurrences(of: .dot + .pathExtension, with: String.empty)
-                    
-                    var date = String.empty
-                    (0...String.dateFormat.count).forEach { _ in
-                        date.append(urlName.removeLast())
-                    }
-                    date = String(date.reversed())
-                    
-                    let duration = String(
-                        format: .recordingDurationFormat,
-                        Int(audioPlayer.duration / 60),
-                        Int(audioPlayer.duration.truncatingRemainder(dividingBy: 60))
-                    )
-                    let recording = Recording(
-                        name: urlName,
-                        date: date,
-                        duration: duration,
-                        url: url
-                    )
-                    if recordingsArray.filter({ $0.name == recording.name }).isEmpty {
-                        recordingsArray.insert(recording, at: .zero)
-                    } else {
-                        return
-                    }
-                }
-        } catch {
-            print(error.localizedDescription)
-        }
-    }
-    
-    private func checkPermission() {
-        recordSession = AVAudioSession.sharedInstance()
-        try? recordSession?.setCategory(.playAndRecord, mode: .default)
-        try? recordSession?.setActive(true)
-        recordSession?.requestRecordPermission() { [weak self] granted in
-            if !granted {
-                self?.showAlert()
-            }
-        }
-        if AVAudioSession.sharedInstance().recordPermission == .denied {
-            print("No access")
-        }
-    }
-    
+        
     private func showAlert() {
         let alert = UIAlertController(
             title: .titleText,
@@ -313,86 +232,7 @@ class VoiceMemosViewController: UIViewController {
         )
         present(alert, animated: true)
     }
-    
-    private func setupRecorder() {
-        guard let path = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask).first else { return }
-        
-        let formatter = DateFormatter()
-        formatter.dateFormat = .dateFormat
-        let dateString = formatter.string(from: Date())
-        let url = path.appendingPathComponent(.getNewNameRecording(countRecordings) + dateString + .dot + .pathExtension)
-        let rateKey = 44100
-        let numberOfChanelsKey = 2
-        do {
-            audioRecorder = try AVAudioRecorder(
-                url: url,
-                settings: [
-                    AVFormatIDKey: Int(kAudioFormatMPEG4AAC),
-                    AVSampleRateKey: rateKey,
-                    AVNumberOfChannelsKey: numberOfChanelsKey,
-                    AVEncoderAudioQualityKey: AVAudioQuality.high.rawValue
-                ]
-            )
-            audioRecorder?.delegate = self
-            audioRecorder?.prepareToRecord()
-        } catch {
-            startRecording(false)
-            print(#line, #function, error.localizedDescription)
-        }
-    }
-    
-    private func startRecording(_ start: Bool) {
-        recordingNameLabel.text = String.getNewNameRecording(countRecordings).replacingOccurrences(of: String.underscore, with: String.space)
-        recordingDurationLabel.text = .zeroTime
-        toggleRecordButton()
-        showRecordingLabels(recordButton.isSelected)
-        if start {
-            if let audioPlayer = audioPlayer,
-               audioPlayer.isPlaying {
-                audioPlayer.stop()
-            }
-            if audioRecorder == nil {
-                setupRecorder()
-                audioRecorder?.record()
-                startTimer(true)
-            }
-        } else {
-            audioRecorder?.stop()
-            audioRecorder = nil
-            startTimer(false)
-            updateListRecordings()
-            listRecordingsTableView.reloadData()
-            countRecordings += 1
-            StorageManager.shared.saveCountRecordings(countRecordings)
-        }
-    }
-    
-    private func startTimer(_ start: Bool) {
-        let timeInterval = 0.1
-        if start {
-            timer = .scheduledTimer(
-                withTimeInterval: timeInterval,
-                repeats: true
-            ) { [weak self] _ in
-                guard let self = self else { return }
-                
-                if let recorder = self.audioRecorder,
-                    recorder.isRecording {
-                    let seconds = 60.0
-                    self.recordingDurationLabel.text = String(
-                        format: .recordingDurationFormat,
-                        Int(recorder.currentTime / seconds),
-                        Int(recorder.currentTime.truncatingRemainder(dividingBy: seconds))
-                    )
-                    recorder.updateMeters()
-                }
-            }
-        } else {
-            timer.invalidate()
-        }
-        
-    }
-    
+
     private func showRecordingLabels(_ show: Bool) {
         let offset = recordingNameLabel.frame.height * 2.5
         if show {
@@ -454,8 +294,9 @@ class VoiceMemosViewController: UIViewController {
     
     private func pushAudioPlayerViewController(for recording: Recording) {
         guard let controller = storyboard?.instantiateViewController(withIdentifier: AudioPlayerViewController.identifier) as? AudioPlayerViewController else { return }
-        controller.recording = recording
+        
         controller.delegate = self
+        controller.presenter = AudioPlayerPresenter(recording: recording)
         navigationController?.pushViewController(controller, animated: true)
     }
 }
@@ -465,21 +306,21 @@ class VoiceMemosViewController: UIViewController {
 extension VoiceMemosViewController: UITableViewDelegate, UITableViewDataSource {
     
     func tableView(_ tableView: UITableView, numberOfRowsInSection section: Int) -> Int {
-        recordingsArray.count
+        presenter.recordingsArray.count
     }
     
     func tableView(_ tableView: UITableView, cellForRowAt indexPath: IndexPath) -> UITableViewCell {
         guard let cell = tableView.dequeueReusableCell(withIdentifier: RecordingTableViewCell.identifier, for: indexPath) as? RecordingTableViewCell else { return UITableViewCell() }
-        cell.configure(with: recordingsArray[indexPath.item])
+        
+        cell.configure(with: presenter.recordingsArray[indexPath.item])
         return cell
     }
     
     func tableView(_ tableView: UITableView, commit editingStyle: UITableViewCell.EditingStyle, forRowAt indexPath: IndexPath) {
         if editingStyle == .delete {
-            try? FileManager.default.removeItem(at: recordingsArray[indexPath.row].url)
-            recordingsArray.remove(at: indexPath.item)
-            updateListRecordings()
-            listRecordingsTableView.reloadData()
+            presenter.removeRecording(at: indexPath.item) {
+                tableView.reloadData()
+            }
         }
     }
     
@@ -488,18 +329,7 @@ extension VoiceMemosViewController: UITableViewDelegate, UITableViewDataSource {
     }
     
     func tableView(_ tableView: UITableView, didSelectRowAt indexPath: IndexPath) {
-        pushAudioPlayerViewController(for: recordingsArray[indexPath.item])
-    }
-}
-
-//MARK: - Extensions AVAudioPlayerDelegate, AVAudioRecorderDelegate
-
-extension VoiceMemosViewController: AVAudioPlayerDelegate, AVAudioRecorderDelegate {
-    
-    func audioRecorderDidFinishRecording(_ recorder: AVAudioRecorder, successfully flag: Bool) {
-        if !flag {
-            startRecording(false)
-        }
+        pushAudioPlayerViewController(for: presenter.recordingsArray[indexPath.item])
     }
 }
 
@@ -507,11 +337,31 @@ extension VoiceMemosViewController: AVAudioPlayerDelegate, AVAudioRecorderDelega
 
 extension VoiceMemosViewController: AudioPlayerViewControllerDelegate {
     
-    func recordingRemoved(_ recording: Recording) {
-        try? FileManager.default.removeItem(at: recording.url)
-        recordingsArray = recordingsArray.filter { $0.name != recording.name }
-        updateListRecordings()
+    func audioPlayerViewControllerClosed(withRemoved recording: Recording) {
+        guard let index = presenter.getIndexRecording(recording) else { return }
+        presenter.removeRecording(at: index) { [weak self] in
+            guard let self = self else { return }
+            
+            self.listRecordingsTableView.reloadData()
+        }
+    }
+}
+
+extension VoiceMemosViewController: VoiceMemosPresenterDelegate {
+    
+    func recordingStarted(_ recordingName: String) {
+        recordingNameLabel.text = recordingName
+        recordingDurationLabel.text = .zeroTime
+        toggleRecordButton()
+        showRecordingLabels(recordButton.isSelected)
+    }
+    
+    func recordingFinished() {
         listRecordingsTableView.reloadData()
+    }
+    
+    func timerStarted(_ duration: String) {
+        recordingDurationLabel.text = duration
     }
 }
 

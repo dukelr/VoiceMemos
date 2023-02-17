@@ -1,7 +1,7 @@
 
 import Foundation
 
-class Recording: Codable {
+final class Recording: Codable {
     var name: String
     var date: String
     var duration: String
