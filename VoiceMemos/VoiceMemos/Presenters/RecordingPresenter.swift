@@ -1,8 +1,11 @@
-//
-//  RecordingPresenter.swift
-//  VoiceMemos
-//
-//  Created by duke on 2/17/23.
-//
 
 import Foundation
+
+final class RecordingPresenter {
+    
+    private(set) var recording: Recording
+    
+    init(recording: Recording) {
+        self.recording = recording
+    }
+}

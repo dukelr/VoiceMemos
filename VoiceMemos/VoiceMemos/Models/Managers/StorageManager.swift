@@ -16,7 +16,6 @@ final class StorageManager {
     }
     
     func loadCountRecordings() -> Int? {
-        guard let count = UserDefaults.standard.object(forKey: .countKey) as? Int else { return nil }
-        return count
+        UserDefaults.standard.object(forKey: .countKey) as? Int
     }
 }
