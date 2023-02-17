@@ -7,14 +7,15 @@ final class RecordingTableViewCell: UITableViewCell {
     private let nameLabel = UILabel()
     private let dateLabel = UILabel()
     private let durationLabel = UILabel()
+    var presenter: RecordingPresenter?
     
-    func configure(with recording: Recording) {
+    func configure() {
         addSubviews()
         backgroundColor = .clear
         selectionStyle = .none
-        dateLabel.text = recording.date
-        nameLabel.text = recording.name
-        durationLabel.text = recording.duration
+        dateLabel.text = presenter?.recording.date
+        nameLabel.text = presenter?.recording.name
+        durationLabel.text = presenter?.recording.duration
     }
     
     private func addSubviews() {

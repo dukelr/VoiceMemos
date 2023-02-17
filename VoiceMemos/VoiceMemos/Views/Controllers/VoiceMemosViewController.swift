@@ -56,13 +56,9 @@ final class VoiceMemosViewController: UIViewController {
     }
     
     private func setupSubviews() {
-        if presenter.countRecordings == .zero {
-            hintLabel.isHidden = false
-        } else {
-            hintLabel.isHidden = true
-        }
         view.backgroundColor = .black
         addSubviews()
+        checkHint()
     }
     
     private func addSubviews() {
@@ -72,6 +68,14 @@ final class VoiceMemosViewController: UIViewController {
         addRecordButton()
         addTableView()
         addHintLabel()
+    }
+    
+    private func checkHint() {
+        if listRecordingsTableView.numberOfRows(inSection: .zero) == .zero {
+            hintLabel.isHidden = false
+        } else {
+            hintLabel.isHidden = true
+        }
     }
     
     private func addHintLabel() {
@@ -312,14 +316,18 @@ extension VoiceMemosViewController: UITableViewDelegate, UITableViewDataSource {
     func tableView(_ tableView: UITableView, cellForRowAt indexPath: IndexPath) -> UITableViewCell {
         guard let cell = tableView.dequeueReusableCell(withIdentifier: RecordingTableViewCell.identifier, for: indexPath) as? RecordingTableViewCell else { return UITableViewCell() }
         
-        cell.configure(with: presenter.recordingsArray[indexPath.item])
+        cell.presenter = RecordingPresenter(recording: presenter.recordingsArray[indexPath.item])
+        cell.configure()
         return cell
     }
     
     func tableView(_ tableView: UITableView, commit editingStyle: UITableViewCell.EditingStyle, forRowAt indexPath: IndexPath) {
         if editingStyle == .delete {
-            presenter.removeRecording(at: indexPath.item) {
+            presenter.removeRecording(at: indexPath.item) { [weak self] in
+                guard let self = self else { return }
+                
                 tableView.reloadData()
+                self.checkHint()
             }
         }
     }
@@ -358,6 +366,7 @@ extension VoiceMemosViewController: VoiceMemosPresenterDelegate {
     
     func recordingFinished() {
         listRecordingsTableView.reloadData()
+        checkHint()
     }
     
     func timerStarted(_ duration: String) {

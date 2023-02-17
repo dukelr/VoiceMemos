@@ -22,6 +22,7 @@
 		ABF8A513299EC57D007CB723 /* VoiceMemosPresenter.swift in Sources */ = {isa = PBXBuildFile; fileRef = ABF8A512299EC57D007CB723 /* VoiceMemosPresenter.swift */; };
 		ABF8A515299EC5AD007CB723 /* AudioPlayerPresenter.swift in Sources */ = {isa = PBXBuildFile; fileRef = ABF8A514299EC5AD007CB723 /* AudioPlayerPresenter.swift */; };
 		ABF8A519299F2C21007CB723 /* Double+extensions.swift in Sources */ = {isa = PBXBuildFile; fileRef = ABF8A518299F2C21007CB723 /* Double+extensions.swift */; };
+		ABF8A51B299FE64D007CB723 /* RecordingPresenter.swift in Sources */ = {isa = PBXBuildFile; fileRef = ABF8A51A299FE64D007CB723 /* RecordingPresenter.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
@@ -42,6 +43,7 @@
 		ABF8A512299EC57D007CB723 /* VoiceMemosPresenter.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = VoiceMemosPresenter.swift; sourceTree = "<group>"; };
 		ABF8A514299EC5AD007CB723 /* AudioPlayerPresenter.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AudioPlayerPresenter.swift; sourceTree = "<group>"; };
 		ABF8A518299F2C21007CB723 /* Double+extensions.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "Double+extensions.swift"; sourceTree = "<group>"; };
+		ABF8A51A299FE64D007CB723 /* RecordingPresenter.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RecordingPresenter.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -133,7 +135,7 @@
 		ABF8A50E299EBF5F007CB723 /* Models */ = {
 			isa = PBXGroup;
 			children = (
-				ABF8A511299EBFC3007CB723 /* Menagers */,
+				ABF8A511299EBFC3007CB723 /* Managers */,
 				ABB8E5A92968320B0091CF9B /* Classes */,
 				ABB8E5AC296832DE0091CF9B /* Exstensions */,
 			);
@@ -145,6 +147,7 @@
 			children = (
 				ABF8A512299EC57D007CB723 /* VoiceMemosPresenter.swift */,
 				ABF8A514299EC5AD007CB723 /* AudioPlayerPresenter.swift */,
+				ABF8A51A299FE64D007CB723 /* RecordingPresenter.swift */,
 			);
 			path = Presenters;
 			sourceTree = "<group>";
@@ -158,12 +161,12 @@
 			path = Storyboards;
 			sourceTree = "<group>";
 		};
-		ABF8A511299EBFC3007CB723 /* Menagers */ = {
+		ABF8A511299EBFC3007CB723 /* Managers */ = {
 			isa = PBXGroup;
 			children = (
 				ABB8E5AA2968327D0091CF9B /* StorageManager.swift */,
 			);
-			path = Menagers;
+			path = Managers;
 			sourceTree = "<group>";
 		};
 /* End PBXGroup section */
@@ -246,6 +249,7 @@
 				ABB8E5A8296832000091CF9B /* Recording.swift in Sources */,
 				ABB8E5AB2968327D0091CF9B /* StorageManager.swift in Sources */,
 				ABB8E5A229681E950091CF9B /* RecordingTableViewCell.swift in Sources */,
+				ABF8A51B299FE64D007CB723 /* RecordingPresenter.swift in Sources */,
 				AB48EF822969F54000EE58BE /* String+extensions.swift in Sources */,
 				ABB8E5A6296820540091CF9B /* VoiceMemosViewController.swift in Sources */,
 				ABF8A513299EC57D007CB723 /* VoiceMemosPresenter.swift in Sources */,

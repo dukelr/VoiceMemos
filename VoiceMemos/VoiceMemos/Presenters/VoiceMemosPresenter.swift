@@ -82,6 +82,7 @@ final class VoiceMemosPresenter: NSObject {
     func removeRecording(at index: Int, _ complition: @escaping () -> ()) {
         try? FileManager.default.removeItem(at: recordingsArray[index].url)
         recordingsArray.remove(at: index)
+        countRecordings -= 1
         updateListRecordings()
         complition()
     }
